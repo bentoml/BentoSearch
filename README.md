@@ -1,8 +1,8 @@
 <div align="center">
-    <h1 align="center">Self-host Llama 3.1 8B with vLLM and BentoML</h1>
+    <h1 align="center">Search-based Llama 3.1 8B with vLLM and BentoML</h1>
 </div>
 
-This is a BentoML example project, showing you how to serve and deploy Llama 3.1 8B using [vLLM](https://vllm.ai), a high-throughput and memory-efficient inference engine.
+This is a BentoML example project demonstrating how to build a retrieval-based search engine using Llama 3.1 8B with [vLLM](https://vllm.ai), a high-throughput and memory-efficient inference engine.
 
 See [here](https://github.com/bentoml/BentoML?tab=readme-ov-file#%EF%B8%8F-what-you-can-build-with-bentoml) for a full list of BentoML example projects.
 
@@ -20,8 +20,7 @@ See [here](https://github.com/bentoml/BentoML?tab=readme-ov-file#%EF%B8%8F-what-
 ## Install dependencies
 
 ```bash
-git clone https://github.com/bentoml/BentoVLLM.git
-cd BentoVLLM/llama3.1-8b-instruct
+git clone https://github.com/bentoml/BentoSearch.git
 pip install -r requirements.txt
 ```
 
@@ -31,11 +30,6 @@ We have defined a BentoML Service in `service.py`. Run `bentoml serve` in you
 
 ```python
 $ bentoml serve .
-
-2024-01-18T07:51:30+0800 [INFO] [cli] Starting production HTTP BentoServer from "service:VLLM" listening on http://localhost:3000 (Press CTRL+C to quit)
-INFO 01-18 07:51:40 model_runner.py:501] Capturing the model for CUDA graphs. This may lead to unexpected consequences if the model is not static. To run the model in eager mode, set 'enforce_eager=True' or use '--enforce-eager' in the CLI.
-INFO 01-18 07:51:40 model_runner.py:505] CUDA graphs can take additional 1~3 GiB memory per GPU. If you are running out of memory, consider decreasing `gpu_memory_utilization` or enforcing eager mode.
-INFO 01-18 07:51:46 model_runner.py:547] Graph capturing finished in 6 secs.
 ```
 
 The server is now active at [http://localhost:3000](http://localhost:3000/). You can interact with it using the Swagger UI or in other different ways.
@@ -45,13 +39,13 @@ The server is now active at [http://localhost:3000](http://localhost:3000/). Yo
 <summary>CURL</summary>
 
 ```bash
-curl -X 'POST' \
-  'http://localhost:3000/generate' \
+curl -N -X 'POST' \
+  'http://localhost:3000/search' \
   -H 'accept: text/event-stream' \
   -H 'Content-Type: application/json' \
   -d '{
-  "prompt": "Explain superconductors like I'\''m five years old",
-  "tokens": null
+  "prompt": "Who won 2024 Olympic Track and Field?",
+  "max_tokens": 8192
 }'
 ```
 
@@ -65,87 +59,11 @@ curl -X 'POST' \
 import bentoml
 
 with bentoml.SyncHTTPClient("http://localhost:3000") as client:
-    response_generator = client.generate(
-        prompt="Explain superconductors like I'm five years old",
-        tokens=None
-    )
-    for response in response_generator:
-        print(response)
-```
-
-</details>
-
-<details>
-
-<summary>OpenAI-compatible endpoints</summary>
-
-This Service uses the `@openai_endpoints` decorator to set up OpenAI-compatible endpoints (`chat/completions` and `completions`). This means your client can interact with the backend Service (in this case, the VLLM class) as if they were communicating directly with OpenAI's API. This [utility](bentovllm_openai/) does not affect your BentoML Service code, and you can use it for other LLMs as well.
-
-```python
-from openai import OpenAI
-
-client = OpenAI(base_url='http://localhost:3000/v1', api_key='na')
-
-# Use the following func to get the available models
-client.models.list()
-
-chat_completion = client.chat.completions.create(
-    model="meta-llama/Meta-Llama-3.1-8B-Instruct",
-    messages=[
-        {
-            "role": "user",
-            "content": "Explain superconductors like I'm five years old"
-        }
-    ],
-    stream=True,
-)
-for chunk in chat_completion:
-    # Extract and print the content of the model's reply
-    print(chunk.choices[0].delta.content or "", end="")
-```
-
-These OpenAI-compatible endpoints also support [vLLM extra parameters](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html#extra-parameters). For example, you can force the chat completion output a JSON object by using the `guided_json` parameters:
-
-```python
-from openai import OpenAI
-
-client = OpenAI(base_url='http://localhost:3000/v1', api_key='na')
-
-# Use the following func to get the available models
-client.models.list()
-
-json_schema = {
-    "type": "object",
-    "properties": {
-        "city": {"type": "string"}
-    }
-}
-
-chat_completion = client.chat.completions.create(
-    model="meta-llama/Meta-Llama-3.1-8B-Instruct",
-    messages=[
-        {
-            "role": "user",
-            "content": "What is the capital of France?"
-        }
-    ],
-    extra_body=dict(guided_json=json_schema),
-)
-print(chat_completion.choices[0].message.content)  # will return something like: {"city": "Paris"}
-```
-
-All supported extra parameters are listed in [vLLM documentation](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html#extra-parameters).
-
-**Note**: If your Service is deployed with [protected endpoints on BentoCloud](https://docs.bentoml.com/en/latest/bentocloud/how-tos/manage-access-token.html#access-protected-deployments), you need to set the environment variable `OPENAI_API_KEY` to your BentoCloud API key first.
-
-```bash
-export OPENAI_API_KEY={YOUR_BENTOCLOUD_API_TOKEN}
-```
-
-You can then use the following line to replace the client in the above code snippet. Refer to [Obtain the endpoint URL](https://docs.bentoml.com/en/latest/bentocloud/how-tos/call-deployment-endpoints.html#obtain-the-endpoint-url) to retrieve the endpoint URL.
-
-```python
-client = OpenAI(base_url='your_bentocloud_deployment_endpoint_url/v1')
+  response_generator = client.search(
+    prompt="Who won 2024 Olympic Track and Field?",
+    max_tokens=8192
+  )
+  for response in response_generator: print(response, end='', flush=True)
 ```
 
 </details>

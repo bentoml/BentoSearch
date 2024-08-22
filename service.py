@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 import asyncio
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List
 
 import bentoml
 import pydantic
@@ -15,7 +15,7 @@ from typing_extensions import Annotated
 from bentovllm_openai.utils import openai_endpoints
 
 
-MAX_TOKENS = 1024
+MAX_TOKENS = 8192
 MAX_CONTENTS = 500
 SYSTEM_PROMPT = """You are a helpful assistant who is expert at answering user's queries based on the cited context.
 
@@ -39,7 +39,7 @@ PROMPT_TEMPLATE = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
 """
 
-MODEL_ID = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+MODEL_ID = "hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4"
 
 
 class QueryResponse(pydantic.BaseModel):
@@ -65,7 +65,7 @@ class Google:
     return url, None
 
   @bentoml.api
-  async def query(self, query: str, num_search: Annotated[int, Ge(0)] = 10, timeout: Annotated[int, Ge(1)] = 3):
+  async def query(self, query: str, num_search: Annotated[int, Ge(0)] = 10, timeout: Annotated[int, Ge(1)] = 3) -> List[QueryResponse]:
     results = await asyncio.gather(*[self.fetch(url, timeout) for url in search(query, num_results=num_search)])
     return [QueryResponse(url=url, description=page_text) for url, page_text in results if page_text is not None]
 
@@ -85,7 +85,7 @@ class Google:
   },
   resources={
     "gpu": 1,
-    "gpu_type": "nvidia-l4",
+    "gpu_type": "nvidia-a100-80gb",
   },
 )
 class Agent:
@@ -110,7 +110,7 @@ class Agent:
     self,
     prompt: str = "Who won the 2024 Olympics for track and field?",
     max_tokens: Annotated[int, Ge(20), Le(MAX_TOKENS)] = MAX_TOKENS,
-    num_search: Annotated[int, Ge(0)] = 10,
+    num_search: Annotated[int, Ge(0)] = 5,
     timeout: Annotated[int, Ge(1)] = 3,
     max_content: Annotated[int, Ge(0), Le(MAX_CONTENTS)] = MAX_CONTENTS,
   ) -> AsyncGenerator[str, None]:
