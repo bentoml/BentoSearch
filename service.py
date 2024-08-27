@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 import asyncio
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator, List, Tuple, Optional
 
 import bentoml
 import pydantic
@@ -49,7 +49,7 @@ class QueryResponse(pydantic.BaseModel):
 
 @bentoml.service(resources={"cpu": 2})
 class Google:
-  async def fetch(self, url, timeout=300):
+  async def fetch(self, url: str, timeout: int=300) -> Tuple[str, Optional[str]]:
     """Fetch the content of a webpage given a URL and a timeout."""
     try:
       print(f"Fetching link: {url}")
