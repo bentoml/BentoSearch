@@ -78,7 +78,7 @@ class Google:
   default_chat_completion_parameters=dict(stop=["<|eot_id|>"]),
 )
 @bentoml.service(
-  name="agentsearch-llama-3.1",
+  name="agentsearch-llama-3-1",
   traffic={
     "timeout": 300,
     "concurrency": 256,  # Matches the default max_num_seqs in the VLLM engine
